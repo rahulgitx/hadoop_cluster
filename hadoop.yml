@@ -1,0 +1,117 @@
+- hosts: hadoop
+  tasks:
+          - name: copying  the hadoop softwares
+            copy:
+                      src: path_name/hadoopfiles/
+                      dest: /home/user/
+
+          - name: installing the jdk file
+            command: rpm -ivh jdk-8u171-linux-x64.rpm
+            ignore_errors: yes
+             
+          - name: installing hadoop file
+            command: rpm -ivh hadoop-1.2.1-1.x86_64.rpm --force
+             
+
+
+
+- hosts: namenode
+  vars_prompt:
+          - name: response
+            prompt: "Do you want a fresh hadoop file system?(Warning: might delete all files if the already exists)(Y or N)"
+            private: no
+
+  tasks:
+          - name: copying the core-site.xml file
+            template: 
+                   src: /path_name/hadoopfiles/nncore.xml
+                   dest: /etc/hadoop/core-site.xml
+           
+          - name: fetching the same file to use in datanodes now that namenode's ip has been included
+            fetch:
+                    src: /etc/hadoop/core-site.xml
+                    dest: /path_name/hadoopfiles/dncore.xml
+                    flat: yes                     
+
+          - name: Create a directory if it does not exist
+            file:
+                   path: /nn
+                   state: directory
+                   mode: '0755'
+ 
+          - name: coying the hdfs-site.xml file
+            copy:
+                  src: /path_name/hadoopfiles/nnhdfs.xml
+                  dest: /etc/hadoop/hdfs-site.xml
+
+          - name: installing python3
+            package: 
+                  name: python3
+                  state: present
+
+          - name: installing pexpect
+            command: sudo pip3 install pexpect
+
+          - name: formatting the hadoop folder
+            expect:
+               command: hadoop namenode -format
+               responses:
+                     'Re-format.*' : "{{ response }}"
+            ignore_errors: yes
+
+          - name: stopping firewalld
+            service:
+                  name: firewalld
+                  state: stopped
+
+          - name: stopping namenode
+            command: hadoop-daemon.sh stop namenode
+            ignore_errors: yes
+
+          - name: starting the hadoop cluster
+            command: hadoop-daemon.sh start namenode
+            ignore_errors: yes
+
+
+
+
+- hosts: datanode
+  tasks:
+          - name: copying the core-site.xml file
+            template:
+                   src: /path_name/hadoopfiles/dncore.xml
+                   dest: /etc/hadoop/core-site.xml
+
+
+          - name: Create a directory if it does not exist
+            file:
+                   path: '/path_name/{{ inventory_hostname }}'
+                   state: directory
+                   mode: '0755'
+
+          - name: copying the hdfs-site.xml file
+            template:
+                  src: /path_name/hadoopfiles/dnhdfs.xml
+                  dest: /etc/hadoop/hdfs-site.xml
+         
+          - name: stopping firewalld
+            service:
+                  name: firewalld
+                  state: stopped
+     
+          - name: starting the datanode
+            command: hadoop-daemon.sh start datanode
+            ignore_errors: yes
+           
+    
+
+
+      
+- hosts: hadoopclient
+  tasks:
+          - name: copying the core-site.xml file
+            template:
+                   src: /path_name/hadoopfiles/dncore.xml
+                   dest: /etc/hadoop/core-site.xml
+
+
